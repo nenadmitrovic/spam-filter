@@ -1,3 +1,4 @@
+
 (ns spam-filter.routes.home
   (:require [spam-filter.layout :as layout]
             [compojure.core :refer [defroutes GET]]
@@ -27,7 +28,7 @@
             {}
             final-words))) 
 
-
+;; Promeniti sa update-in funkcijom
 
 (defn incf
   "This function increases the count of feature/category pair"
@@ -42,6 +43,16 @@
       (assoc-in new-val [f cat] (inc (get-in new-val [f cat]))))))))
 
 
+(def counter (agent 0))
+
+(send counter inc)
+
+@counter
+
+(def ^:private feature-db
+  (agent {} :error-handler #(println "Error: " %2)))
+
+@feature-db
 
 
 (defn about-page []
