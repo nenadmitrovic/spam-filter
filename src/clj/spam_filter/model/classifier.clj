@@ -2,8 +2,17 @@
   (:require [clojure.string :as st]))
 
 
+(def fc (atom {}))
 
 
+@fc
+
+(def cc (atom {}))
+
+
+@cc
+
+; extracts features from the text
 (defn getwords
   "Divides the text on any character that isn't a letter.
   Converted to lowercase"
@@ -17,57 +26,78 @@
             final-words))) 
 
 
-
+; increase the count of a feature/category pair
 (defn incf
-  "This function increases the count of feature/category pair"
-  [f cat fc]
-  (let [map1 (if (= (get fc f) nil)
-               (assoc fc f {})
-               fc)]
-(if (get-in map1 [f cat])
-  (update-in map1 [f cat] inc)
-  (let [new-val (assoc-in map1 [f cat] 0)]
-      (update-in new-val [f cat] inc)))))
-
-
-
-
-(defn incc
-  "Increase the count of a category"
-  [cat]
-  (if (get cc cat)
-    (update cc cat inc)
-    (let [new-val (assoc cc cat 0)]
-      (update new-val cat inc))))
-
-
-
-(defn fcount
-  "The number of times a feature has appeared in a category"
   [f cat]
-  (if (and (contains? fc f) (get-in fc [f cat]))
-       (float (get-in fc [f cat]))
-       0.0))
+(if (not (contains? @fc f))
+  (swap! fc #(assoc % f {})))
+(if (not (get-in @fc [f cat]))
+  (swap! fc #(assoc-in % [f cat] 0)))
+(swap! fc #(update-in % [f cat] inc)))
+
+
+; increase the count of a category
+(defn incc
+ [cat]
+(if (not (contains? @cc cat))
+(swap! cc #(assoc % cat 0)))
+(swap! cc #(update % cat inc)))
 
 
 
+; The number of times a feature has appeared in a category
+(defn fcount
+  [f cat]
+(let [cat (get-in @fc [f cat])]
+  (if (not (nil? cat))
+    cat
+    0.0)))
+
+
+
+; The number of items in a category
 (defn catcount
-  "The number of items in a category"
   [cat]
-(if (contains? cc cat)
-  (get cc cat)
-  0))
+(let [n-of-items (get @cc cat)]
+  (if (not (nil? n-of-items))
+    n-of-items
+    0)))
 
 
+; The total numbers of items
 (defn totalcount
-  "The total number of items"
   []
-  (reduce + (vals cc)))
+(reduce + (vals @cc)))
 
 
+
+; The list of all categories
 (defn categories
-  "The list of all categories"
-  []
-  (keys cc))
+[]
+(keys @cc))
+
+
+
+(defn train
+  [t cat]
+(incc cat)
+(let [ws (keys (getwords t))]
+  (for [w ws] (incf w cat))))
+
+@fc
+@cc
+
+(train "the quick brown fox jumps over the lazy dog" "good")
+(train "make quick money in the online casino" "bad")
+
+(fcount "money" "good")
+
+(fcount "online" "good")
+
+
+
+
+
+
 
 
