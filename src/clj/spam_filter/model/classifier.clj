@@ -35,6 +35,8 @@
   (swap! fc #(assoc-in % [f cat] 0)))
 (swap! fc #(update-in % [f cat] inc)))
 
+(incf "jumps" "")
+
 
 ; increase the count of a category
 (defn incc
@@ -63,6 +65,8 @@
     n-of-items
     0)))
 
+(catcount "bad")
+
 
 ; The total numbers of items
 (defn totalcount
@@ -84,15 +88,93 @@
 (let [ws (keys (getwords t))]
   (for [w ws] (incf w cat))))
 
+(train "jumps fox" "good")
+
 @fc
 @cc
 
-(train "the quick brown fox jumps over the lazy dog" "good")
-(train "make quick money in the online casino" "bad")
 
-(fcount "money" "good")
 
-(fcount "online" "good")
+(defn sampletrain
+[]
+(do
+  [(train "Nobody owns the water." "good")
+  (train "the quick rabit jumps fences" "good")
+  (train "buy pharmaceuticals now" "bad")
+  (train "make quick money at the online casino" "bad")
+  (train "the quick brown fox jumps" "good")]))
+
+(sampletrain)
+
+@fc
+
+@cc
+
+(defn fprob
+  [f cat]
+(if (= (catcount cat) 0)
+  0
+(float (/ (fcount f cat) (catcount cat)))))
+
+(fprob "the" "good")
+
+(fprob "money" "bad")
+
+(defn weightedprob
+  [f cat]
+(let [weight 1
+      ap 0.5
+      basicprob (atom 0)
+      totals (atom 0)
+      bp (atom 0)]
+(reset! basicprob (fprob f cat))
+(reset! totals (reduce + (vals (get @fc f))))
+(reset! bp (/ (+ (* weight ap) (* @totals @basicprob)) (+ weight @totals)))
+@bp))
+
+(weightedprob "money" "good")
+(weightedprob "money" "bad")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+          
+
+
+
+
+
+
+
 
 
 
