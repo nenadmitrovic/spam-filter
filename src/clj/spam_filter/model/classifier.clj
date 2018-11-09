@@ -90,8 +90,6 @@
 
 (train "jumps fox" "good")
 
-@fc
-@cc
 
 
 
@@ -106,9 +104,7 @@
 
 (sampletrain)
 
-@fc
 
-@cc
 
 (defn fprob
   [f cat]
@@ -116,24 +112,19 @@
   0
 (float (/ (fcount f cat) (catcount cat)))))
 
-(fprob "the" "good")
 
-(fprob "money" "bad")
+
+
 
 (defn weightedprob
   [f cat]
 (let [weight 1
       ap 0.5
-      basicprob (atom 0)
-      totals (atom 0)
-      bp (atom 0)]
-(reset! basicprob (fprob f cat))
-(reset! totals (reduce + (vals (get @fc f))))
-(reset! bp (/ (+ (* weight ap) (* @totals @basicprob)) (+ weight @totals)))
-@bp))
+      basicprob (fprob f cat)
+      totals (reduce + (vals (get @fc f)))
+      bp (/ (+ (* weight ap) (* totals basicprob)) (+ weight totals))]
+bp))
 
-(weightedprob "money" "good")
-(weightedprob "money" "bad")
 
 
 
