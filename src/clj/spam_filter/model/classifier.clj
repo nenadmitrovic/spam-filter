@@ -3,12 +3,13 @@
 
 ; Counts of feature/category combinations
 (def fc (atom {}))
+@fc
 
 
 ; Counts of documents in each category
 ; How many times every classification has been used
 (def cc (atom {}))
-
+@cc
 
 ; extracts features from the text
 (defn getwords
@@ -46,9 +47,9 @@
 ; The number of times a feature has appeared in a category
 (defn fcount
   [f cat]
-(let [cat (get-in @fc [f cat])]
-  (if (not (nil? cat))
-    cat
+(let [num (get-in @fc [f cat])]
+  (if (not (nil? num))
+    num
     0.0)))
 
 
@@ -71,14 +72,12 @@
 
 
 
-
 ; The list of all categories
 (defn categories
 []
 (keys @cc))
 
 
-@cc
 
 (defn train
   [t cat]
@@ -98,24 +97,32 @@
 
 (defn sampletrain
 []
-(do
-  [(train "Nobody owns the water." "good")
+[(train "Nobody owns the water." "good")
   (train "the quick rabbit jumps fences" "good")
   (train "buy pharmaceuticals now" "bad")
   (train "make quick money at the online casino" "bad")
-  (train "the quick brown fox jumps" "good")]))
+  (train "the quick brown fox jumps" "good")])
+
+@fc
+@cc
+
+(sampletrain)
 
 
-
+; probability that a word is in particular category
+; Pr(word | classification)
 (defn fprob
   [f cat]
 (if (= (catcount cat) 0)
   0
 (float (/ (fcount f cat) (catcount cat)))))
 
+(fprob "quick" "good")
 
 
 
+; probability that a word is in particular category
+; assumed probability 0.5
 (defn weightedprob
   [f cat fprob]
 (let [weight 1
@@ -130,7 +137,6 @@ bp))
 ; Extracts features and multiplies all
 ; their probabilities together to get
 ; an overall probability Pr(Document | Category)
-
 (defn docprob
   [item cat]
   (let [features (keys (getwords item))]
@@ -144,12 +150,15 @@ bp))
        (* p (weightedprob (first features) cat fprob)))))))
 
 
-
+;returns product of Pr(Document | Category) and Pr(Category)
 (defn prob
   [item cat]
   (let [catprob (/ (catcount cat) (totalcount))
         docprob (docprob item cat)]
     (* docprob catprob)))
+
+(prob "quick rabbit" "good")
+(prob "quick rabbit" "bad")
 
 
 (def thresholds (atom {}))
@@ -165,6 +174,30 @@ bp))
 (if (contains? @thresholds cat)
   (get @thresholds cat)
 1.0))
+
+
+; calculate probability for each category
+(defn classify
+  [item]
+(let [probs (reduce (fn [res cat] (assoc res cat (prob item cat))) {} (categories))
+      max (val (apply max-key val probs))
+      best (key (apply max-key val probs))]
+(for [cat (filter #(not= % best) (keys probs))]
+  (if (> (* (get probs cat) (getthreshold best)) (get probs best))
+    "unknown"
+    best))))
+
+(classify "quick rabbit")
+
+
+
+
+
+
+
+
+
+
 
 
 
