@@ -1,9 +1,12 @@
 (ns spam-filter.model.classifier
-  (:require [clojure.string :as st]))
+  (:require [clojure.string :as st])
+  (:use [clojure.java.io :only [file]]))
 
 ; Counts of feature/category combinations
 (def fc (atom {}))
 @fc
+
+
 
 
 ; Counts of documents in each category
@@ -23,6 +26,8 @@
               (assoc final-map (.toLowerCase word) 1))
             {}
             final-words)))
+
+(getwords "Danas je lep dan")
 
 
 ; increase the count of a feature/category pair
@@ -125,12 +130,17 @@
 ; assumed probability 0.5
 (defn weightedprob
   [f cat fprob]
-(let [weight 1
+(let [weight 1.0
       ap 0.5
       basicprob (fprob f cat)
-      totals (reduce + (vals (get @fc f)))
+      totals (reduce + (for [c (categories)] (fcount f c)))
       bp (/ (+ (* weight ap) (* totals basicprob)) (+ weight totals))]
 bp))
+
+(weightedprob "money" "good" fprob)
+
+(weightedprob "nekarec" "good" fprob)
+(sampletrain)
 
 
 
@@ -150,7 +160,7 @@ bp))
        (* p (weightedprob (first features) cat fprob)))))))
 
 
-;returns product of Pr(Document | Category) and Pr(Category)
+; returns product of Pr(Document | Category) and Pr(Category)
 (defn prob
   [item cat]
   (let [catprob (/ (catcount cat) (totalcount))
@@ -187,82 +197,75 @@ bp))
     "unknown"
     best))))
 
+
 (classify "quick rabbit")
+(classify "quick money")
 
 
 
+; Fisher method
 
+(defn cprob
+  [f cat]
+(let [clf (fprob f cat)]
+  (if (= clf 0)
+    0
+    (let [freqsum (reduce + (for [c (categories)] (fprob f c)))
+          p (/ clf freqsum)]
+      p))))
 
 
 
 
+(defn invchi2
+  [chi df]
+(let [m (/ chi 2.0)
+      sum (atom (/ 1 (Math/exp m)))
+      term (atom (/ 1 (Math/exp m)))]
+(doseq [i (range 1 (quot df 2))]
+  (do
+    (swap! term #(* % (/ m i)))
+    (swap! sum #(+ % @term))))
+(min @sum 1.0)))
 
 
+(defn fisherprob
+  [item cat]
+(let [features (keys (getwords item))
+      p (reduce (fn [val f] (* val (weightedprob f cat cprob))) 1 features)
+      fscore (* (Math/log p) -2)]
+(invchi2 fscore (* 2 (count features)))))
 
 
+(def minimus (agent {}))
 
 
+(defn setminimum
+  [cat mini]
+(send minimus assoc cat mini))
 
 
 
+(defn getminimum
+  [cat]
+(if-let [res (get @minimus cat)]
+  res
+  0.0))
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+(defn classify
+  [item]
+(let [best (atom nil)
+      maxi (atom 0.0)
+      p (atom 0.0)]
+(doseq [c (categories)]
+  (swap! p #(let [% (fisherprob item c)] %))
+  (if (and (> @p (getminimum c)) (> @p @maxi))
+    (do
+      (swap! best #(let [% c] %))
+      (swap! maxi #(let [% @p] %)))))
+@best))
 
 
 
