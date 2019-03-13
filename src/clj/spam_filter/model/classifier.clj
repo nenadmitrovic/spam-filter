@@ -1,18 +1,17 @@
 (ns spam-filter.model.classifier
-  (:require [clojure.string :as st])
+  (:require [clojure.string :as st]
+            [clojure.java.jdbc :as sql])
   (:use [clojure.java.io :only [file]]))
 
-; Counts of feature/category combinations
-(def fc (atom {}))
-@fc
+
+
+(def db {:subprotocol "mysql"
+         :subname "//localhost/spam_classifier"
+         :user "root"
+         :password ""})
 
 
 
-
-; Counts of documents in each category
-; How many times every classification has been used
-(def cc (atom {}))
-@cc
 
 ; extracts features from the text
 (defn getwords
@@ -27,68 +26,148 @@
             {}
             final-words)))
 
-(getwords "Danas je lep dan")
 
-
-; increase the count of a feature/category pair
-(defn incf
-  [f cat] 
-(if (not (contains? @fc f))
-  (swap! fc #(assoc % f {})))
-(if (not (get-in @fc [f cat]))
-  (swap! fc #(assoc-in % [f cat] 0)))
-(swap! fc #(update-in % [f cat] inc)))
-
-
-
-; increase the count of a category
-(defn incc
- [cat]
-(if (not (contains? @cc cat))
-(swap! cc #(assoc % cat 0)))
-(swap! cc #(update % cat inc)))
-
-
-; The number of times a feature has appeared in a category
 (defn fcount
   [f cat]
-(let [num (get-in @fc [f cat])]
-  (if (not (nil? num))
-    num
-    0.0)))
+(let [res (sql/query db ["select count from fc where feature=? and category=?" f cat])]
+(if (= (:count (first res)) nil)
+  0
+  (float (:count (first res))))))
 
 
 
-; The number of items in a category
+(defn incf
+  [f cat]
+(let [res (fcount f cat)]
+(if (= res 0)
+(sql/insert! db :fc {:feature f :category cat :count 1})
+(sql/execute! db ["update fc set count=? where feature=? and category=?" (inc res) f cat]))))
+
+
+
 (defn catcount
   [cat]
-(let [n-of-items (get @cc cat)]
-  (if (not (nil? n-of-items))
-    n-of-items
-    0)))
+(let [res (:count (first (sql/query db ["select count from cc where category=?" cat])))]
+  (if (= res nil)
+    0
+    res)))
+
+
+
+(defn incc
+  [cat]
+(let [res (catcount cat)]
+  (if (= res 0)
+    (sql/insert! db :cc {:category cat :count 1})
+    (sql/execute! db ["update cc set count=? where category=?" (inc res) cat]))))
 
 
 
 
-; The total numbers of items
+(defn categories
+  []
+  (map :category (sql/query db ["select category from cc"])))
+
+
+
 (defn totalcount
   []
-(reduce + (vals @cc)))
+(let [res (reduce + (map :count (sql/query db ["select count from cc"])))]
+  (if (= res nil)
+    0
+    res)))
 
 
 
-; The list of all categories
-(defn categories
+
+(def token-regex #"[a-zA-Z]{3,}")
+
+
+(def header-fields
+  ["To:"
+   "From:"
+   "Subject:"
+   "Return-Path:"])
+
+
+
+
+(defn header-token-regex
+  [f]
+(re-pattern (str f "(.*)\n")))
+
+
+
+(defn extract-tokens-from-headers
+  [text]
+(for [field header-fields]
+  (map #(str field %1)
+       (mapcat (fn [x] (->> x second (re-seq token-regex)))
+               (re-seq (header-token-regex field)
+                       text)))))
+
+
+
+(defn extract-tokens
+  [text]
+(filter #(< (count %) 20)
+        (apply concat
+       (re-seq token-regex text)
+       (extract-tokens-from-headers text))))
+
+
+
+
+
+
+(defn populate-emails
+  "Returns a sequence of vectors of the form [filname type]"
 []
-(keys @cc))
+(letfn [(get-email-files [type1]
+          (map (fn [f] [(.toString f) (.toString type1)])
+               (rest (file-seq (file (str "corpus/" type1))))))]
+  (mapcat get-email-files ["ham" "spam"])))
+
+
+(defn populate-emails1
+  []
+  (letfn [(get-email-files [type1]
+            (map (fn [f] [(.toString f) (.toString type1)])
+                 (take 20 (rest (file-seq (file (str "corpus/" type1)))))))]
+    (mapcat get-email-files ["ham" "spam"])))
+
+
+(def hams (file "corpus/ham"))
+
+
+
+(def spams (file "corpus/spam"))
+
+(def hams-20 (take 20 (rest (file-seq hams))))
+
+(def spams-20 (take 20 (rest (file-seq spams))))
+
+
+
 
 
 
 (defn train
   [t cat]
-(incc cat)
-(let [ws (keys (getwords t))]
-  (for [w ws] (incf w cat))))
+(doseq [w (extract-tokens t)]
+  (incf w cat))
+  (incc cat))
+
+
+
+(defn train-from-corpus!
+  [corpus]
+(doseq [v corpus]
+  (let [[filename type] v]
+    (train (slurp filename) type))))
+
+
+
 
 
 
@@ -100,6 +179,7 @@
 
 
 
+
 (defn sampletrain
 []
 [(train "Nobody owns the water." "good")
@@ -108,10 +188,9 @@
   (train "make quick money at the online casino" "bad")
   (train "the quick brown fox jumps" "good")])
 
-@fc
-@cc
 
-(sampletrain)
+
+
 
 
 ; probability that a word is in particular category
@@ -122,7 +201,7 @@
   0
 (float (/ (fcount f cat) (catcount cat)))))
 
-(fprob "quick" "good")
+
 
 
 
@@ -137,10 +216,8 @@
       bp (/ (+ (* weight ap) (* totals basicprob)) (+ weight totals))]
 bp))
 
-(weightedprob "money" "good" fprob)
 
-(weightedprob "nekarec" "good" fprob)
-(sampletrain)
+
 
 
 
@@ -167,8 +244,6 @@ bp))
         docprob (docprob item cat)]
     (* docprob catprob)))
 
-(prob "quick rabbit" "good")
-(prob "quick rabbit" "bad")
 
 
 (def thresholds (atom {}))
@@ -185,6 +260,8 @@ bp))
   (get @thresholds cat)
 1.0))
 
+(setthreshold "bad" 3)
+
 
 ; calculate probability for each category
 (defn classify
@@ -196,11 +273,6 @@ bp))
   (if (> (* (get probs cat) (getthreshold best)) (get probs best))
     "unknown"
     best))))
-
-
-(classify "quick rabbit")
-(classify "quick money")
-
 
 
 ; Fisher method
@@ -254,7 +326,7 @@ bp))
 
 
 
-(defn classify
+(defn classify-fisher
   [item]
 (let [best (atom nil)
       maxi (atom 0.0)
@@ -266,6 +338,15 @@ bp))
       (swap! best #(let [% c] %))
       (swap! maxi #(let [% @p] %)))))
 @best))
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,0 +1,82 @@
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Neka</title>
+    <link rel="stylesheet"
+    href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+    integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+    crossorigin="anonymous">
+  </head>
+  <body>
+
+    <nav class="navbar navbar-inverse">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="#">Spam Filter</a>
+      </div>
+      <ul class="nav navbar-nav">
+        <li><a href="new_signup.html"></a></li>
+      </ul>
+    </nav>
+
+<div class="container">
+      <div class="jumbotron">
+        <h2><strong>Welcome to the Spam Filter</strong></h2>
+<p>To classify your email, put the text in the text field below and press the Classify button.</p>
+<p>If you want to train the classifier mark your email as spam or ham and press the train button.</p>
+      </div>
+</div>
+
+    
+
+
+
+    <div class="container">
+      
+        <form class="" action="/classify" method="post">
+
+
+
+            <div class="form-group">
+
+              {% csrf-field %}
+
+              <label  for="my-area"><font size="5">Input Text For Classification</font></label>
+              <textarea  id="my-area" class="form-control" name="text" rows="8" cols="80">
+            </textarea>
+
+            </div>
+
+            <button class="btn btn-danger" type="submit" name="button" value="classify">Classify</button>
+
+            <div class="pull-right">
+              <label class for="spam">Check as spam</label>
+              <input id="spam" type="checkbox" name="class" value="spam">
+              <label for="ham">Check as ham</label>
+              <input id="ham" type="checkbox" name="class" value="ham">
+              <span style="margin:0 10px;"> </span>
+              <button  class="btn btn-danger pull-right" type="submit" name="button" value="train">Train</button>
+              <p></p>
+            </div>
+
+
+        </form>
+
+
+      </div>
+
+    </div>
+
+<p></p>
+
+<div class="container">
+      <div class="jumbotron">
+        <p>The classifier has classified your email as:<font color="red"> {{res}}</font></p>
+      </div>
+</div>
+
+    
+
+  </body>
+</html>
